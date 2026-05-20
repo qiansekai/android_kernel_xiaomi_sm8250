@@ -361,6 +361,9 @@ if [ $KSU_ENABLE -eq 1 ]; then
     ./patch_linux
     rm Image
     mv oImage Image
+    # Replace compiler banner strings with stock MIUI values
+    python3 scripts/fix_banner.py out/arch/arm64/boot/Image
+    echo "[+] Compiler banner replaced."
     cd -
 fi
 

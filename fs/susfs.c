@@ -1486,9 +1486,19 @@ static void susfs_run_extra_works(struct work_struct *work) {
 }
 
 /* susfs_init */
-void susfs_init(void) {\
+void susfs_init(void) {
 	SUSFS_LOGI("Initializing susfs_extra_works\n");
 	INIT_WORK(&susfs_extra_works, susfs_run_extra_works);
+
+	/* Apply uname spoofing at boot using compile-time stock MIUI defaults */
+	down_write(&uts_sem);
+	strncpy(utsname()->release, my_uname.release, __NEW_UTS_LEN);
+	strncpy(utsname()->version, my_uname.version, __NEW_UTS_LEN);
+	up_write(&uts_sem);
+	static_branch_enable(&susfs_is_uname_spoof_buffer_set);
+	SUSFS_LOGI("susfs: uname spoofed to %s %s\n",
+		   my_uname.release, my_uname.version);
+
 	SUSFS_LOGI("susfs is initialized! version: " SUSFS_VERSION " \n");
 }
 

@@ -72,7 +72,7 @@ MAKE_ARGS="ARCH=arm64 \
            OBJCOPY=llvm-objcopy \
            OBJDUMP=llvm-objdump \
            STRIP=llvm-strip \
-           KSU_MANAGER_PACKAGE=com.resukisu.resukisu"
+           KSU_MANAGER_PACKAGE=isekai.joucho"
 
 
 if [ "$1" == "j1" ]; then

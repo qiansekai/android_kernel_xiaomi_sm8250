@@ -189,6 +189,14 @@ echo "Skipping AOSP build (MIUI only)..."
 # Patch for SukiSU KPM support. 
 #if [ $KSU_ENABLE -eq 1 ]; then
 #    cd out/arch/arm64/boot/
+    if [ ! -f patch_linux ]; then
+        echo "Downloading patch_linux..."
+        wget --timeout=300 "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
+    else
+        echo "patch_linux already exists, skip download"
+    fi
+    # Original download:
+    #
 #    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
 #    chmod +x patch_linux
 #    ./patch_linux
@@ -359,7 +367,15 @@ mkdir -p anykernel/kernels/miui/
 # Patch for SukiSU KPM support. 
 if [ $KSU_ENABLE -eq 1 ]; then
     cd out/arch/arm64/boot/
-    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
+    if [ ! -f patch_linux ]; then
+        echo "Downloading patch_linux..."
+        wget --timeout=300 "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
+    else
+        echo "patch_linux already exists, skip download"
+    fi
+    # Original download:
+    #
+    # wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
     chmod +x patch_linux
     ./patch_linux
     rm Image

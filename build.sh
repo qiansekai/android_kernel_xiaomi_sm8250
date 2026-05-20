@@ -71,7 +71,8 @@ MAKE_ARGS="ARCH=arm64 \
            NM=llvm-nm \
            OBJCOPY=llvm-objcopy \
            OBJDUMP=llvm-objdump \
-           STRIP=llvm-strip"
+           STRIP=llvm-strip \
+           KSU_MANAGER_PACKAGE=com.resukisu.resukisu"
 
 
 if [ "$1" == "j1" ]; then
@@ -112,6 +113,9 @@ echo "TARGET_DEVICE: $TARGET_DEVICE"
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+    # Patch: remove v2 APK signature check, verify by package name only
+    sed -i 's/    return check_v2_signature(path, signature_index);$/    return true;/' KernelSU/kernel/manager/apk_sign.c
+    echo "[+] Manager signature check removed."
 else
     echo "KSU is disabled"
 fi
@@ -129,81 +133,83 @@ echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/AstideLabs/A
 git clone https://github.com/AstideLabs/AnyKernel3 -b master --single-branch --depth=1 anykernel
 
 # ------------- Building for AOSP -------------
+echo "Skipping AOSP build (MIUI only)..."
 
-echo "Building for AOSP......"
-make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+#echo "Building for AOSP......"
+#make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
-if [ $KSU_ENABLE -eq 1 ]; then
-    scripts/config --file out/.config \
-    -e KSU \
-    -e THREAD_INFO_IN_TASK \
-    -e KSU_SUSFS \
-    -e KSU_SUSFS_SUS_PATH \
-    -e KSU_SUSFS_SUS_MOUNT \
-    -e KSU_SUSFS_SUS_KSTAT \
-    -e KSU_SUSFS_SPOOF_UNAME \
-    -e KSU_SUSFS_ENABLE_LOG \
-    -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
-    -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
-    -e KSU_SUSFS_OPEN_REDIRECT \
-    -e KSU_SUSFS_SUS_MAP \
-    -e KSU_MULTI_MANAGER_SUPPORT \
-    -e KPM
-else
-    scripts/config --file out/.config -d KSU
-fi
+#if [ $KSU_ENABLE -eq 1 ]; then
+#    scripts/config --file out/.config \
+#    -e KSU \
+#    -e THREAD_INFO_IN_TASK \
+#    -e KSU_SUSFS \
+#    -e KSU_SUSFS_SUS_PATH \
+#    -e KSU_SUSFS_SUS_MOUNT \
+#    -e KSU_SUSFS_SUS_KSTAT \
+#    -e KSU_SUSFS_SPOOF_UNAME \
+#    -e KSU_SUSFS_ENABLE_LOG \
+#    -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+#    -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+#    -e KSU_SUSFS_OPEN_REDIRECT \
+#    -e KSU_SUSFS_SUS_MAP \
+#    -e KSU_MULTI_MANAGER_SUPPORT \
+#    -e KPM
+#else
+#    scripts/config --file out/.config -d KSU
+#fi
 
-scripts/config --file out/.config \
-    -e BBG
+#scripts/config --file out/.config \
+#    -e BBG
 
-scripts/config --file out/.config \
-    -e REKERNEL \
-    -e REKERNEL_NETWORK
+#scripts/config --file out/.config \
+#    -e REKERNEL \
+#    -e REKERNEL_NETWORK \
+#    -e XIAOMI_MIUI
 
-make $MAKE_ARGS -j$(nproc)
+#yes "" | make $MAKE_ARGS -j$(nproc)
 
 
-if [ -f "out/arch/arm64/boot/Image" ]; then
-    echo "The file [out/arch/arm64/boot/Image] exists. AOSP Build successfully."
-else
-    echo "The file [out/arch/arm64/boot/Image] does not exist. Seems AOSP build failed."
-    exit 1
-fi
+#if [ -f "out/arch/arm64/boot/Image" ]; then
+#    echo "The file [out/arch/arm64/boot/Image] exists. AOSP Build successfully."
+#else
+#    echo "The file [out/arch/arm64/boot/Image] does not exist. Seems AOSP build failed."
+#    exit 1
+#fi
 
-echo "Generating [out/arch/arm64/boot/dtb]......"
-find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+#echo "Generating [out/arch/arm64/boot/dtb]......"
+#find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
-rm -rf anykernel/kernels/
+#rm -rf anykernel/kernels/
 
-mkdir -p anykernel/kernels/aosp/
+#mkdir -p anykernel/kernels/aosp/
 
 # Patch for SukiSU KPM support. 
-if [ $KSU_ENABLE -eq 1 ]; then
-    cd out/arch/arm64/boot/
-    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm Image
-    mv oImage Image
-    cd -
-fi
+#if [ $KSU_ENABLE -eq 1 ]; then
+#    cd out/arch/arm64/boot/
+#    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
+#    chmod +x patch_linux
+#    ./patch_linux
+#    rm Image
+#    mv oImage Image
+#    cd -
+#fi
 
-cp out/arch/arm64/boot/Image anykernel/kernels/aosp/
-cp out/arch/arm64/boot/dtb anykernel/kernels/aosp/
-cp out/arch/arm64/boot/dtbo.img anykernel/kernels/aosp/
+#cp out/arch/arm64/boot/Image anykernel/kernels/aosp/
+#cp out/arch/arm64/boot/dtb anykernel/kernels/aosp/
+#cp out/arch/arm64/boot/dtbo.img anykernel/kernels/aosp/
 
-cd anykernel 
+#cd anykernel 
 
-ZIP_FILENAME=APTKernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
+#ZIP_FILENAME=APTKernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
 
-zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
+#zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
 
-mv $ZIP_FILENAME ../
+#mv $ZIP_FILENAME ../
 
-cd ..
+#cd ..
 
 
-echo "Build for AOSP finished."
+#echo "Build for AOSP finished."
 
 # ------------- End of Building for AOSP -------------
 #  If you don't need AOSP you can comment out the above block [Building for AOSP]
@@ -327,7 +333,7 @@ scripts/config --file out/.config \
     -d REKERNEL \
     -d REKERNEL_NETWORK
 
-make $MAKE_ARGS -j$(nproc)
+yes "" | make $MAKE_ARGS -j$(nproc)
 
 if [ -f "out/arch/arm64/boot/Image" ]; then
     echo "The file [out/arch/arm64/boot/Image] exists. MIUI Build successfully."

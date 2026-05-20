@@ -116,6 +116,9 @@ if [ $KSU_ENABLE -eq 1 ]; then
     # Patch: remove v2 APK signature check, verify by package name only
     sed -i 's/    return check_v2_signature(path, signature_index);$/    return true;/' KernelSU/kernel/manager/apk_sign.c
     echo "[+] Manager signature check removed."
+    # Patch: add default dontaudit rules to suppress AVC log leaks
+    sed -i "s|    // Allow all binder transactions|    // Default dontaudit rules to suppress common AVC log leaks\n    ksu_dontaudit(db, \"untrusted_app\", \"lsposed_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"magisk_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"su_file\", \"file\", ALL);\n\n    // Allow all binder transactions|" KernelSU/kernel/selinux/rules.c
+    echo "[+] Default dontaudit rules added."
 else
     echo "KSU is disabled"
 fi

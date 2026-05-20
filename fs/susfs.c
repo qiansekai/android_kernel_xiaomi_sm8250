@@ -614,7 +614,10 @@ out_spoof_kstat:
 
 /* spoof_uname */
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
-static struct st_susfs_uname my_uname = {0};
+static struct st_susfs_uname my_uname = {
+    .release = "4.19.157-perf-gf8cdf943b2b3",
+    .version = "#1 SMP PREEMPT Wed Jun  7 08:25:17 UTC 2023"
+};
 DEFINE_STATIC_KEY_FALSE(susfs_is_uname_spoof_buffer_set);
 static DEFINE_SEQLOCK(susfs_uname_seqlock);
 

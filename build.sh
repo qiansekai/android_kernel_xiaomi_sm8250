@@ -362,7 +362,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     rm Image
     mv oImage Image
     # Replace compiler banner strings with stock MIUI values
-    python3 scripts/fix_banner.py out/arch/arm64/boot/Image
+    python3 $HOME/android_kernel_xiaomi_sm8250/scripts/fix_banner.py Image
     echo "[+] Compiler banner replaced."
     cd -
 fi

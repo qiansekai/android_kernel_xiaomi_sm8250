@@ -165,9 +165,6 @@ KSU_ZIP_STR=NoKernelSU
 if [ "$2" == "ksu" ]; then
     KSU_ENABLE=1
     KSU_ZIP_STR=ReSukiSU-SuSFS
-    # Patch: cache lsposed_file SID for AVC audit suppression
-    python3 scripts/patch_selinux_sid.py
-    echo "[+] lsposed_file SID cached for AVC suppression."
 else
     KSU_ENABLE=0
 fi

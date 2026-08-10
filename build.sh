@@ -5,6 +5,7 @@
 # Ensure the script exits on error
 set -e
 
+KERNEL_ROOT="$(cd "$(dirname "$0")" && pwd)"
 TOOLCHAIN_PATH=$HOME/zyc-clang/bin
 GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
 TARGET_DEVICE=$1
@@ -108,7 +109,7 @@ if [ -z "${GITHUB_PROXY+x}" ]; then
     GITHUB_PROXY="https://ghfast.top/"
 fi
 FORCE_NET="${FORCE_NET:-0}"
-AK3_CACHE_DIR="${AK3_CACHE_DIR:-$HOME/android_kernel_xiaomi_sm8250/.cache/anykernel3}"
+AK3_CACHE_DIR="${AK3_CACHE_DIR:-$KERNEL_ROOT/.cache/anykernel3}"
 
 github_url() {
     local u="$1"
@@ -288,7 +289,7 @@ rm -rf anykernel/.git
 # SKIP_AOSP     ./patch_linux
 # SKIP_AOSP     rm Image
 # SKIP_AOSP     mv oImage Image
-# SKIP_AOSP     python3 $HOME/android_kernel_xiaomi_sm8250/scripts/fix_banner.py Image
+# SKIP_AOSP     python3 $KERNEL_ROOT/scripts/fix_banner.py Image
 # SKIP_AOSP     echo "[+] Compiler banner replaced."
 # SKIP_AOSP     cd -
 # SKIP_AOSP fi

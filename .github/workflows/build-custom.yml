@@ -1,0 +1,93 @@
+name: Build Custom Kernel (build.sh)
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: '设备代号'
+        required: true
+        default: 'alioth'
+        type: choice
+        options:
+          - alioth
+          - apollo
+          - cas
+          - cmi
+          - elish
+          - lmi
+          - munch
+          - pipa
+          - psyche
+          - thyme
+          - umi
+      ksu:
+        description: '启用 ReSukiSU'
+        required: true
+        type: boolean
+        default: true
+  push:
+    paths:
+      - 'build.sh'
+      - 'fs/susfs.c'
+      - 'kernel/sys.c'
+      - 'drivers/kernelsu/**'
+      - 'scripts/fix_banner.py'
+      - 'scripts/patch_selinux_sid.py'
+      - '.github/workflows/build-custom.yml'
+
+jobs:
+  build-kernel:
+    name: Build ${{ github.event.inputs.device || 'alioth' }} | KSU
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex gawk \
+            git gnupg gperf imagemagick libncurses-dev \
+            lib32readline-dev lib32z1-dev liblz4-tool \
+            libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync \
+            schedtool squashfs-tools xsltproc zip zlib1g-dev python3
+
+      - name: Cache ccache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ccache_mikernel
+          key: ${{ runner.os }}-kernel-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-kernel-ccache-
+
+      - name: Setup zyc-clang 15.0.7 Toolchain
+        run: |
+          mkdir -p $HOME/zyc-clang
+          cd $HOME/zyc-clang
+          wget -q https://github.com/ZyCromerZ/Clang/releases/download/15.0.7-20251111-release/Clang-15.0.7-20251111.tar.gz
+          tar -zxf Clang-15.0.7-20251111.tar.gz
+
+      - name: Run Custom Build Script
+        env:
+          GITHUB_PROXY: ''
+          FORCE_NET: '1'
+        run: |
+          chmod +x build.sh
+          DEVICE="${{ github.event.inputs.device || 'alioth' }}"
+          ARGS="$DEVICE"
+          if [ "${{ github.event.inputs.ksu || 'true' }}" == "true" ]; then
+            ARGS="$ARGS ksu"
+          fi
+          echo "Executing: ./build.sh $ARGS"
+          ./build.sh $ARGS
+
+      - name: Upload Flashable ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: APTKernel-${{ github.event.inputs.device || 'alioth' }}-ksu-${{ github.run_id }}
+          path: APTKernel_*.zip
+          compression-level: 0

@@ -812,6 +812,18 @@ noinline int slow_avc_audit(struct selinux_state *state,
 
 	a->selinux_audit_data = &sad;
 
+#ifdef CONFIG_KSU_SUSFS
+	if (unlikely(denied)) {
+		static u32 __susfs_lsposed_sid = 0;
+		if (unlikely(!__susfs_lsposed_sid)) {
+			u32 sid;
+			if (!security_secctx_to_secid("u:object_r:lsposed_file:s0", strlen("u:object_r:lsposed_file:s0"), &sid) && sid)
+				WRITE_ONCE(__susfs_lsposed_sid, sid);
+		}
+		if (unlikely(READ_ONCE(__susfs_lsposed_sid) && sad.tsid == READ_ONCE(__susfs_lsposed_sid)))
+			return 0;
+	}
+#endif
 	common_lsm_audit(a, avc_audit_pre_callback, avc_audit_post_callback);
 	return 0;
 }

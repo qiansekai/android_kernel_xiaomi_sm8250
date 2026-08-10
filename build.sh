@@ -99,10 +99,75 @@ clang --version
 
 
 
+
+# ---------- CN mirror / local cache (daily builds need no proxy) ----------
+# GITHUB_PROXY default: ghfast.top prefix for github.com & raw.githubusercontent.com
+# FORCE_NET=1  always re-fetch KernelSU / Baseband-guard / AnyKernel3
+# AK3_CACHE_DIR  persistent AnyKernel3 cache (default: $HOME/android_kernel_xiaomi_sm8250/.cache/anykernel3)
+GITHUB_PROXY="${GITHUB_PROXY:-https://ghfast.top/}"
+FORCE_NET="${FORCE_NET:-0}"
+AK3_CACHE_DIR="${AK3_CACHE_DIR:-$HOME/android_kernel_xiaomi_sm8250/.cache/anykernel3}"
+
+github_url() {
+    local u="$1"
+    case "$u" in
+        https://github.com/*|https://raw.githubusercontent.com/*)
+            printf '%s%s\n' "$GITHUB_PROXY" "$u"
+            ;;
+        *)
+            printf '%s\n' "$u"
+            ;;
+    esac
+}
+
+# Session-only git insteadOf (does NOT touch ~/.gitconfig)
+_setup_git_mirror() {
+    if [ -n "${_GIT_MIRROR_CFG:-}" ] && [ -f "${_GIT_MIRROR_CFG}" ]; then
+        return 0
+    fi
+    _GIT_MIRROR_CFG="$(mktemp /tmp/gitmirror.XXXXXX)"
+    git config -f "$_GIT_MIRROR_CFG" url."${GITHUB_PROXY}https://github.com/".insteadOf "https://github.com/"
+    git config -f "$_GIT_MIRROR_CFG" url."${GITHUB_PROXY}https://raw.githubusercontent.com/".insteadOf "https://raw.githubusercontent.com/"
+    export GIT_CONFIG_GLOBAL="$_GIT_MIRROR_CFG"
+    echo "[net] git mirror config: $GITHUB_PROXY (session only)"
+}
+
+curl_gh() {
+    local url="$1"; shift || true
+    local mirrored
+    mirrored="$(github_url "$url")"
+    if [ "$mirrored" != "$url" ]; then
+        echo "[net] curl $mirrored"
+        if curl -fLSs --connect-timeout 20 --max-time 300 "$@" "$mirrored"; then
+            return 0
+        fi
+        echo "[net] mirror failed, try direct: $url" >&2
+    fi
+    curl -fLSs --connect-timeout 20 --max-time 300 "$@" "$url"
+}
+
+git_clone_gh() {
+    local url="$1"; shift
+    _setup_git_mirror
+    local mirrored
+    mirrored="$(github_url "$url")"
+    echo "[net] git clone $mirrored $*"
+    if git clone "$mirrored" "$@"; then
+        return 0
+    fi
+    echo "[net] mirror clone failed, try direct: $url" >&2
+    git clone "$url" "$@"
+}
+
+# --------------------------------------------------------------------------
+
 KSU_ZIP_STR=NoKernelSU
 if [ "$2" == "ksu" ]; then
     KSU_ENABLE=1
     KSU_ZIP_STR=ReSukiSU-SuSFS
+    # Patch: cache lsposed_file SID for AVC audit suppression
+    python3 scripts/patch_selinux_sid.py
+    echo "[+] lsposed_file SID cached for AVC suppression."
 else
     KSU_ENABLE=0
 fi
@@ -112,118 +177,143 @@ echo "TARGET_DEVICE: $TARGET_DEVICE"
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
-    curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+    if [ "$FORCE_NET" = "1" ] || [ ! -d KernelSU/kernel ]; then
+        echo "[net] KernelSU setup.sh via mirror"
+        _setup_git_mirror
+        curl_gh "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+    else
+        echo "[cache] reuse existing KernelSU/ (FORCE_NET=1 to refresh)"
+    fi
     # Patch: remove v2 APK signature check, verify by package name only
     sed -i 's/    return check_v2_signature(path, signature_index);$/    return true;/' KernelSU/kernel/manager/apk_sign.c
     echo "[+] Manager signature check removed."
     # Patch: add default dontaudit rules to suppress AVC log leaks
     sed -i "s|    // Allow all binder transactions|    // Default dontaudit rules to suppress common AVC log leaks\n    ksu_dontaudit(db, \"untrusted_app\", \"lsposed_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"magisk_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"su_file\", \"file\", ALL);\n\n    // Allow all binder transactions|" KernelSU/kernel/selinux/rules.c
     echo "[+] Default dontaudit rules added."
+    # Patch: cache lsposed_file SID for AVC audit suppression
+    python3 scripts/patch_selinux_sid.py
+    echo "[+] lsposed_file SID cached for AVC suppression."
 else
     echo "KSU is disabled"
 fi
 
 echo "Integrating Baseband-guard..."
-curl -LSs "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh" | bash
+if [ "$FORCE_NET" = "1" ] || [ ! -d drivers/baseband_guard ]; then
+    echo "[net] Baseband-guard setup via mirror"
+    _setup_git_mirror
+    curl_gh "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh" | bash
+else
+    echo "[cache] reuse existing drivers/baseband_guard/ (FORCE_NET=1 to refresh)"
+fi
 sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
 echo "Cleaning..."
 
 rm -rf out/
-rm -rf anykernel/
 
-echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/AstideLabs/AnyKernel3)"
-git clone https://github.com/AstideLabs/AnyKernel3 -b master --single-branch --depth=1 anykernel
+# AnyKernel3: persistent cache → copy into anykernel/ (no daily GitHub clone)
+need_ak3=0
+if [ "$FORCE_NET" = "1" ]; then
+    need_ak3=1
+elif [ ! -f "$AK3_CACHE_DIR/anykernel.sh" ]; then
+    need_ak3=1
+fi
+if [ "$need_ak3" = "1" ]; then
+    echo "[net] clone AnyKernel3 into $AK3_CACHE_DIR"
+    rm -rf "$AK3_CACHE_DIR"
+    mkdir -p "$(dirname "$AK3_CACHE_DIR")"
+    git_clone_gh "https://github.com/AstideLabs/AnyKernel3" -b master --single-branch --depth=1 "$AK3_CACHE_DIR"
+else
+    echo "[cache] reuse AnyKernel3 at $AK3_CACHE_DIR"
+fi
+rm -rf anykernel
+cp -a "$AK3_CACHE_DIR" anykernel
+rm -rf anykernel/.git
 
-# ------------- Building for AOSP -------------
-echo "Skipping AOSP build (MIUI only)..."
-
-#echo "Building for AOSP......"
-#make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
-
-#if [ $KSU_ENABLE -eq 1 ]; then
-#    scripts/config --file out/.config \
-#    -e KSU \
-#    -e THREAD_INFO_IN_TASK \
-#    -e KSU_SUSFS \
-#    -e KSU_SUSFS_SUS_PATH \
-#    -e KSU_SUSFS_SUS_MOUNT \
-#    -e KSU_SUSFS_SUS_KSTAT \
-#    -e KSU_SUSFS_SPOOF_UNAME \
-#    -e KSU_SUSFS_ENABLE_LOG \
-#    -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
-#    -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
-#    -e KSU_SUSFS_OPEN_REDIRECT \
-#    -e KSU_SUSFS_SUS_MAP \
-#    -e KSU_MULTI_MANAGER_SUPPORT \
-#    -e KPM
-#else
-#    scripts/config --file out/.config -d KSU
-#fi
-
-#scripts/config --file out/.config \
-#    -e BBG
-
-#scripts/config --file out/.config \
-#    -e REKERNEL \
-#    -e REKERNEL_NETWORK \
-#    -e XIAOMI_MIUI
-
-#yes "" | make $MAKE_ARGS -j$(nproc)
-
-
-#if [ -f "out/arch/arm64/boot/Image" ]; then
-#    echo "The file [out/arch/arm64/boot/Image] exists. AOSP Build successfully."
-#else
-#    echo "The file [out/arch/arm64/boot/Image] does not exist. Seems AOSP build failed."
-#    exit 1
-#fi
-
-#echo "Generating [out/arch/arm64/boot/dtb]......"
-#find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
-
-#rm -rf anykernel/kernels/
-
-#mkdir -p anykernel/kernels/aosp/
-
-# Patch for SukiSU KPM support. 
-#if [ $KSU_ENABLE -eq 1 ]; then
-#    cd out/arch/arm64/boot/
-    if [ ! -f patch_linux ]; then
-        echo "Downloading patch_linux..."
-        wget --timeout=300 "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
-    else
-        echo "patch_linux already exists, skip download"
-    fi
-    # Original download:
-    #
-#    wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
-#    chmod +x patch_linux
-#    ./patch_linux
-#    rm Image
-#    mv oImage Image
-#    cd -
-#fi
-
-#cp out/arch/arm64/boot/Image anykernel/kernels/aosp/
-#cp out/arch/arm64/boot/dtb anykernel/kernels/aosp/
-#cp out/arch/arm64/boot/dtbo.img anykernel/kernels/aosp/
-
-#cd anykernel 
-
-#ZIP_FILENAME=APTKernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
-
-#zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
-
-#mv $ZIP_FILENAME ../
-
-#cd ..
-
-
-#echo "Build for AOSP finished."
-
-# ------------- End of Building for AOSP -------------
-#  If you don't need AOSP you can comment out the above block [Building for AOSP]
+# SKIP_AOSP # ------------- Building for AOSP -------------
+# SKIP_AOSP 
+# SKIP_AOSP echo "Building for AOSP......"
+# SKIP_AOSP make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+# SKIP_AOSP 
+# SKIP_AOSP if [ $KSU_ENABLE -eq 1 ]; then
+# SKIP_AOSP     scripts/config --file out/.config \
+# SKIP_AOSP     -e KSU \
+# SKIP_AOSP     -e THREAD_INFO_IN_TASK \
+# SKIP_AOSP     -e KSU_SUSFS \
+# SKIP_AOSP     -e KSU_SUSFS_SUS_PATH \
+# SKIP_AOSP     -e KSU_SUSFS_SUS_MOUNT \
+# SKIP_AOSP     -e KSU_SUSFS_SUS_KSTAT \
+# SKIP_AOSP     -e KSU_SUSFS_SPOOF_UNAME \
+# SKIP_AOSP     -e KSU_SUSFS_ENABLE_LOG \
+# SKIP_AOSP     -e KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
+# SKIP_AOSP     -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+# SKIP_AOSP     -e KSU_SUSFS_OPEN_REDIRECT \
+# SKIP_AOSP     -e KSU_SUSFS_SUS_MAP \
+# SKIP_AOSP     -e KSU_MULTI_MANAGER_SUPPORT \
+# SKIP_AOSP     -e KPM
+# SKIP_AOSP else
+# SKIP_AOSP     scripts/config --file out/.config -d KSU
+# SKIP_AOSP fi
+# SKIP_AOSP 
+# SKIP_AOSP scripts/config --file out/.config \
+# SKIP_AOSP     -e BBG
+# SKIP_AOSP 
+# SKIP_AOSP scripts/config --file out/.config \
+# SKIP_AOSP     -e XIAOMI_MIUI
+# SKIP_AOSP 
+# SKIP_AOSP yes "" | make $MAKE_ARGS -j$(nproc)
+# SKIP_AOSP 
+# SKIP_AOSP if [ -f "out/arch/arm64/boot/Image" ]; then
+# SKIP_AOSP     echo "The file [out/arch/arm64/boot/Image] exists. AOSP Build successfully."
+# SKIP_AOSP else
+# SKIP_AOSP     echo "The file [out/arch/arm64/boot/Image] does not exist. Seems AOSP build failed."
+# SKIP_AOSP     exit 1
+# SKIP_AOSP fi
+# SKIP_AOSP 
+# SKIP_AOSP echo "Generating [out/arch/arm64/boot/dtb]......"
+# SKIP_AOSP find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+# SKIP_AOSP 
+# SKIP_AOSP rm -rf anykernel/kernels/
+# SKIP_AOSP 
+# SKIP_AOSP mkdir -p anykernel/kernels/aosp/
+# SKIP_AOSP 
+# SKIP_AOSP # Patch for SukiSU KPM support.
+# SKIP_AOSP if [ $KSU_ENABLE -eq 1 ]; then
+# SKIP_AOSP     cd out/arch/arm64/boot/
+# SKIP_AOSP     if [ ! -f patch_linux ]; then
+# SKIP_AOSP         echo "Downloading patch_linux..."
+# SKIP_AOSP         curl -LSsO --connect-timeout 300 "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
+# SKIP_AOSP     else
+# SKIP_AOSP         echo "patch_linux already exists, skip download"
+# SKIP_AOSP     fi
+# SKIP_AOSP     chmod +x patch_linux
+# SKIP_AOSP     ./patch_linux
+# SKIP_AOSP     rm Image
+# SKIP_AOSP     mv oImage Image
+# SKIP_AOSP     python3 $HOME/android_kernel_xiaomi_sm8250/scripts/fix_banner.py Image
+# SKIP_AOSP     echo "[+] Compiler banner replaced."
+# SKIP_AOSP     cd -
+# SKIP_AOSP fi
+# SKIP_AOSP 
+# SKIP_AOSP cp out/arch/arm64/boot/Image anykernel/kernels/aosp/
+# SKIP_AOSP cp out/arch/arm64/boot/dtb anykernel/kernels/aosp/
+# SKIP_AOSP cp out/arch/arm64/boot/dtbo.img anykernel/kernels/aosp/
+# SKIP_AOSP 
+# SKIP_AOSP cd anykernel
+# SKIP_AOSP 
+# SKIP_AOSP ZIP_FILENAME=APTKernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +%Y%m%d_%H%M%S)_anykernel3_${GIT_COMMIT_ID}.zip
+# SKIP_AOSP 
+# SKIP_AOSP zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
+# SKIP_AOSP 
+# SKIP_AOSP mv $ZIP_FILENAME ../
+# SKIP_AOSP 
+# SKIP_AOSP cd ..
+# SKIP_AOSP 
+# SKIP_AOSP 
+# SKIP_AOSP echo "Build for AOSP finished."
+# SKIP_AOSP 
+# SKIP_AOSP # ------------- End of Building for AOSP -------------
+# SKIP_AOSP #  If you don't need AOSP you can comment out the above block [Building for AOSP]
 
 
 # ------------- Building for MIUI -------------
@@ -308,7 +398,9 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS_OPEN_REDIRECT \
     -e KSU_SUSFS_SUS_MAP \
     -e KSU_MULTI_MANAGER_SUPPORT \
-    -e KPM
+    # Patch: cache lsposed_file SID for AVC audit suppression
+    python3 scripts/patch_selinux_sid.py
+    echo "[+] lsposed_file SID cached for AVC suppression."
 else
     scripts/config --file out/.config -d KSU
 fi
@@ -348,6 +440,9 @@ yes "" | make $MAKE_ARGS -j$(nproc)
 
 if [ -f "out/arch/arm64/boot/Image" ]; then
     echo "The file [out/arch/arm64/boot/Image] exists. MIUI Build successfully."
+    # Patch: cache lsposed_file SID for AVC audit suppression
+    python3 scripts/patch_selinux_sid.py
+    echo "[+] lsposed_file SID cached for AVC suppression."
 else
     echo "The file [out/arch/arm64/boot/Image] does not exist. Seems MIUI build failed."
     exit 1
@@ -364,25 +459,12 @@ mv .dts.bak ${dts_source}
 rm -rf anykernel/kernels/
 mkdir -p anykernel/kernels/miui/
 
-# Patch for SukiSU KPM support. 
+# KPM removed upstream (ReSukiSU 774defdfc+); skip patch_linux.
+# Still rewrite compiler banner strings to stock MIUI values.
 if [ $KSU_ENABLE -eq 1 ]; then
     cd out/arch/arm64/boot/
-    if [ ! -f patch_linux ]; then
-        echo "Downloading patch_linux..."
-        wget --timeout=300 "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
-    else
-        echo "patch_linux already exists, skip download"
-    fi
-    # Original download:
-    #
-    # wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm Image
-    mv oImage Image
-    # Replace compiler banner strings with stock MIUI values
     python3 $HOME/android_kernel_xiaomi_sm8250/scripts/fix_banner.py Image
-    echo "[+] Compiler banner replaced."
+    echo "[+] Compiler banner replaced (no KPM)."
     cd -
 fi
 

@@ -104,7 +104,9 @@ clang --version
 # GITHUB_PROXY default: ghfast.top prefix for github.com & raw.githubusercontent.com
 # FORCE_NET=1  always re-fetch KernelSU / Baseband-guard / AnyKernel3
 # AK3_CACHE_DIR  persistent AnyKernel3 cache (default: $HOME/android_kernel_xiaomi_sm8250/.cache/anykernel3)
-GITHUB_PROXY="${GITHUB_PROXY:-https://ghfast.top/}"
+if [ -z "${GITHUB_PROXY+x}" ]; then
+    GITHUB_PROXY="https://ghfast.top/"
+fi
 FORCE_NET="${FORCE_NET:-0}"
 AK3_CACHE_DIR="${AK3_CACHE_DIR:-$HOME/android_kernel_xiaomi_sm8250/.cache/anykernel3}"
 

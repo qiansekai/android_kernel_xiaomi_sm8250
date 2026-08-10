@@ -76,10 +76,9 @@ setup_baseband_guard() {
           fi
         )
     else
+        git clone "$BBG_REPO" "$BBG_DIR"
         if [ -n "$ref" ]; then
-            git clone --branch "$ref" "$BBG_REPO" "$BBG_DIR"
-        else
-            git clone "$BBG_REPO" "$BBG_DIR"
+            ( cd "$BBG_DIR" && git checkout -q "$ref" )
         fi
         echo " - repo ready"
     fi

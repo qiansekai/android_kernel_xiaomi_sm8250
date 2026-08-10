@@ -197,9 +197,9 @@ fi
 
 echo "Integrating Baseband-guard..."
 if [ "$FORCE_NET" = "1" ] || [ ! -d drivers/baseband_guard ]; then
-    echo "[net] Baseband-guard setup via mirror"
+    echo "[net] Baseband-guard setup via bundled script (pinned cef0daa)"
     _setup_git_mirror
-    curl_gh "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh" | bash
+    bash scripts/bbg_setup.sh cef0daa
 else
     echo "[cache] reuse existing drivers/baseband_guard/ (FORCE_NET=1 to refresh)"
 fi

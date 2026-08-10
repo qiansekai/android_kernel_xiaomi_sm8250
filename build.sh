@@ -177,9 +177,8 @@ echo "TARGET_DEVICE: $TARGET_DEVICE"
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     if [ "$FORCE_NET" = "1" ] || [ ! -d KernelSU/kernel ]; then
-        echo "[net] KernelSU setup.sh via mirror"
-        _setup_git_mirror
-        curl_gh "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+        echo "[net] KernelSU setup via bundled script (pinned 537a2005)"
+        bash scripts/ksu_setup.sh 537a2005
     else
         echo "[cache] reuse existing KernelSU/ (FORCE_NET=1 to refresh)"
     fi

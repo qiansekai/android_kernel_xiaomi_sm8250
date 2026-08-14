@@ -26,6 +26,7 @@ on:
         type: boolean
         default: true
   push:
+    branches: [android16-aptusitu-new]
     paths:
       - 'build.sh'
       - 'fs/susfs.c'

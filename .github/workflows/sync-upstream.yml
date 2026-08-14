@@ -1,0 +1,56 @@
+name: Sync Upstream (Kernel)
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Sync upstream to tracking branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          git remote add upstream https://github.com/AstideLabs/android_kernel_xiaomi_sm8250.git
+          git fetch upstream android16-aptusitu-new --unshallow || git fetch upstream android16-aptusitu-new
+          git fetch origin
+          if git rev-parse origin/upstream-track >/dev/null 2>&1; then
+            AHEAD=$(git rev-list --count origin/upstream-track..upstream/android16-aptusitu-new 2>/dev/null || echo 0)
+          else
+            AHEAD=1
+          fi
+          echo "AHEAD=$AHEAD" >> "$GITHUB_ENV"
+          echo "upstream ahead by $AHEAD commits"
+          git push origin upstream/android16-aptusitu-new:refs/heads/upstream-track --force
+
+      - name: Notify upstream update
+        if: env.AHEAD != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          EXIST=$(gh issue list --repo "${{ github.repository }}" --search "上游内核更新" --state open --limit 1 --json number -q '.[0].number' 2>/dev/null || echo '')
+          if [ -z "$EXIST" ]; then
+            gh issue create --repo "${{ github.repository }}" --title "上游内核更新 ${AHEAD} 提交" --body "检测到上游 AstideLabs/android_kernel_xiaomi_sm8250 更新（${AHEAD} 提交）。已同步到 upstream-track 分支（纯上游，不含定制）。
+
+更新定制分支 android16-aptusitu-new：
+cd ~/android_kernel_xiaomi_sm8250
+git fetch origin
+git checkout android16-aptusitu-new
+git rebase origin/upstream-track
+git push myfork android16-aptusitu-new --force
+
+冲突时逐个解决（build.sh/security/susfs 常冲突）。"
+          fi

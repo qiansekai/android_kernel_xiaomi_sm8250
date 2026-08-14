@@ -402,7 +402,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
     -e KSU_SUSFS_OPEN_REDIRECT \
     -e KSU_SUSFS_SUS_MAP \
-    -e KSU_MULTI_MANAGER_SUPPORT \
+    -e KSU_MULTI_MANAGER_SUPPORT
     # Patch: cache lsposed_file SID for AVC audit suppression
     python3 scripts/patch_selinux_sid.py
     echo "[+] lsposed_file SID cached for AVC suppression."
@@ -445,9 +445,11 @@ yes "" | make $MAKE_ARGS -j$(nproc)
 
 if [ -f "out/arch/arm64/boot/Image" ]; then
     echo "The file [out/arch/arm64/boot/Image] exists. MIUI Build successfully."
-    # Patch: cache lsposed_file SID for AVC audit suppression
-    python3 scripts/patch_selinux_sid.py
-    echo "[+] lsposed_file SID cached for AVC suppression."
+    if [ $KSU_ENABLE -eq 1 ]; then
+        # Patch: cache lsposed_file SID for AVC audit suppression
+        python3 scripts/patch_selinux_sid.py
+        echo "[+] lsposed_file SID cached for AVC suppression."
+    fi
 else
     echo "The file [out/arch/arm64/boot/Image] does not exist. Seems MIUI build failed."
     exit 1

@@ -190,7 +190,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     sed -i "s|    // Allow all binder transactions|    // Default dontaudit rules to suppress common AVC log leaks\n    ksu_dontaudit(db, \"untrusted_app\", \"lsposed_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"magisk_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"su_file\", \"file\", ALL);\n\n    // Allow all binder transactions|" KernelSU/kernel/selinux/rules.c
     echo "[+] Default dontaudit rules added."
     # Patch: cache lsposed_file SID for AVC audit suppression
-    python3 scripts/patch_selinux_sid.py
+    # python3 scripts/patch_selinux_sid.py
     echo "[+] lsposed_file SID cached for AVC suppression."
 else
     echo "KSU is disabled"
@@ -398,7 +398,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS_SUS_MAP \
     -e KSU_MULTI_MANAGER_SUPPORT \
     # Patch: cache lsposed_file SID for AVC audit suppression
-    python3 scripts/patch_selinux_sid.py
+    # python3 scripts/patch_selinux_sid.py
     echo "[+] lsposed_file SID cached for AVC suppression."
 else
     scripts/config --file out/.config -d KSU
@@ -440,7 +440,7 @@ yes "" | make $MAKE_ARGS -j$(nproc)
 if [ -f "out/arch/arm64/boot/Image" ]; then
     echo "The file [out/arch/arm64/boot/Image] exists. MIUI Build successfully."
     # Patch: cache lsposed_file SID for AVC audit suppression
-    python3 scripts/patch_selinux_sid.py
+    # python3 scripts/patch_selinux_sid.py
     echo "[+] lsposed_file SID cached for AVC suppression."
 else
     echo "The file [out/arch/arm64/boot/Image] does not exist. Seems MIUI build failed."

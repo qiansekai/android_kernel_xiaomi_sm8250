@@ -462,7 +462,7 @@ mkdir -p anykernel/kernels/miui/
 # Still rewrite compiler banner strings to stock MIUI values.
 if [ $KSU_ENABLE -eq 1 ]; then
     cd out/arch/arm64/boot/
-    python3 $HOME/android_kernel_xiaomi_sm8250/scripts/fix_banner.py Image
+    python3 $KERNEL_ROOT/scripts/fix_banner.py Image
     echo "[+] Compiler banner replaced (no KPM)."
     cd -
 fi

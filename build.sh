@@ -362,19 +362,7 @@ mkdir -p anykernel/kernels/miui/
 # Patch for SukiSU KPM support. 
 if [ $KSU_ENABLE -eq 1 ]; then
     cd out/arch/arm64/boot/
-    if [ ! -f patch_linux ]; then
-        echo "Downloading patch_linux..."
-        wget --timeout=300 "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux"
-    else
-        echo "patch_linux already exists, skip download"
-    fi
-    # Original download:
-    #
-    # wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm Image
-    mv oImage Image
+    # KPM removed upstream (ReSukiSU 774defdfc+); skip patch_linux
     # Replace compiler banner strings with stock MIUI values
     python3 $HOME/android_kernel_xiaomi_sm8250/scripts/fix_banner.py Image
     echo "[+] Compiler banner replaced."

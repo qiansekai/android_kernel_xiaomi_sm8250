@@ -20,7 +20,7 @@ jobs:
 
       - name: Sync upstream to tracking branch
         env:
-          GH_TOKEN: ${{ github.token }}
+          SYNC_PAT: ${{ secrets.SYNC_PAT }}
         run: |
           set -e
           git remote add upstream https://github.com/AstideLabs/android_kernel_xiaomi_sm8250.git
@@ -33,6 +33,7 @@ jobs:
           fi
           echo "AHEAD=$AHEAD" >> "$GITHUB_ENV"
           echo "upstream ahead by $AHEAD commits"
+          git remote set-url origin "https://x-access-token:${SYNC_PAT}@github.com/${{ github.repository }}.git"
           git push origin upstream/android16-aptusitu-new:refs/heads/upstream-track --force
 
       - name: Notify upstream update

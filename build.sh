@@ -430,6 +430,7 @@ scripts/config --file out/.config \
     -e LTO_NONE \
     -e SF_BINDER \
     -e XIAOMI_MIUI \
+    -e MI_SCHED \
     -d MI_MEMORY_SYSFS \
     -e TASK_DELAY_ACCT \
     -e MIUI_ZRAM_MEMORY_TRACKING \

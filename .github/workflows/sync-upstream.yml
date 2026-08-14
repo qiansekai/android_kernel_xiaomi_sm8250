@@ -43,14 +43,5 @@ jobs:
           set -e
           EXIST=$(gh issue list --repo "${{ github.repository }}" --search "上游内核更新" --state open --limit 1 --json number -q '.[0].number' 2>/dev/null || echo '')
           if [ -z "$EXIST" ]; then
-            gh issue create --repo "${{ github.repository }}" --title "上游内核更新 ${AHEAD} 提交" --body "检测到上游 AstideLabs/android_kernel_xiaomi_sm8250 更新（${AHEAD} 提交）。已同步到 upstream-track 分支（纯上游，不含定制）。
-
-更新定制分支 android16-aptusitu-new：
-cd ~/android_kernel_xiaomi_sm8250
-git fetch origin
-git checkout android16-aptusitu-new
-git rebase origin/upstream-track
-git push myfork android16-aptusitu-new --force
-
-冲突时逐个解决（build.sh/security/susfs 常冲突）。"
+            gh issue create --repo "${{ github.repository }}" --title "上游内核更新 ${AHEAD} 提交" --body "检测到上游更新（${AHEAD} 提交）。已同步到 upstream-track 分支。更新 android16-aptusitu-new: cd ~/android_kernel_xiaomi_sm8250 && git rebase origin/upstream-track && git push myfork android16-aptusitu-new --force。冲突时逐个解决。"
           fi

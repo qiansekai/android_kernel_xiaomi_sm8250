@@ -112,7 +112,7 @@ echo "TARGET_DEVICE: $TARGET_DEVICE"
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
-    curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+    bash scripts/ksu_setup.sh 537a2005
     # Patch: remove v2 APK signature check, verify by package name only
     sed -i 's/    return check_v2_signature(path, signature_index);$/    return true;/' KernelSU/kernel/manager/apk_sign.c
     echo "[+] Manager signature check removed."
@@ -124,7 +124,7 @@ else
 fi
 
 echo "Integrating Baseband-guard..."
-curl -LSs "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh" | bash
+bash scripts/bbg_setup.sh cef0daa
 sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
 
 echo "Cleaning..."

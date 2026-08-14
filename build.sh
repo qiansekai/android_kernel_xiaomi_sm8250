@@ -380,6 +380,12 @@ sed -i 's/\/\/39 01 00 00 01 00 03 51 03 FF/39 01 00 00 01 00 03 51 03 FF/g' ${d
 sed -i 's/\/\/39 01 00 00 11 00 03 51 03 FF/39 01 00 00 11 00 03 51 03 FF/g' ${dts_source}/dsi-panel-j2-p2-1-38-0c-0a-dsc-cmd.dtsi
 
 
+# Ensure drivers/kernelsu/Kconfig exists for defconfig even without KSU build
+if [ ! -e drivers/kernelsu/Kconfig ]; then
+    mkdir -p drivers/kernelsu
+    touch drivers/kernelsu/Kconfig
+fi
+
 make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then

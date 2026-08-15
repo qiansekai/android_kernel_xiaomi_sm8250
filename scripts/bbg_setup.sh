@@ -95,7 +95,7 @@ setup_baseband_guard() {
     echo " - symlink created"
 
     # Makefile entry (idempotent)
-    if ! grep -q 'baseband-guard/baseband_guard.o' "$SECURITY_MAKEFILE"; then
+    if ! grep -q '^obj-$(CONFIG_BBG) += baseband-guard/$' "$SECURITY_MAKEFILE"; then
         printf '\nobj-$(CONFIG_BBG) += baseband-guard/\n' >> "$SECURITY_MAKEFILE"
         echo " - Makefile updated"
     fi

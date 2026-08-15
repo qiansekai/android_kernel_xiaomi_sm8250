@@ -30,6 +30,8 @@ on:
     paths:
       - 'build.sh'
       - 'fs/susfs.c'
+      - 'fs/proc/**'
+      - 'include/linux/susfs_def.h'
       - 'kernel/sys.c'
       - 'drivers/kernelsu/**'
       - 'scripts/fix_banner.py'

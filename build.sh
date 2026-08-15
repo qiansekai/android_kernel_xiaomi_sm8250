@@ -189,6 +189,9 @@ if [ $KSU_ENABLE -eq 1 ]; then
     # Patch: add default dontaudit rules to suppress AVC log leaks
     sed -i "s|    // Allow all binder transactions|    // Default dontaudit rules to suppress common AVC log leaks\n    ksu_dontaudit(db, \"untrusted_app\", \"lsposed_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"magisk_file\", \"file\", ALL);\n    ksu_dontaudit(db, \"untrusted_app\", \"su_file\", \"file\", ALL);\n\n    // Allow all binder transactions|" KernelSU/kernel/selinux/rules.c
     echo "[+] Default dontaudit rules added."
+    # Patch: enable SELinux hide by default (KernelSU 537a2005 defaults false -> true)
+    sed -i 's/__maybe_static bool ksu_selinux_hide_enabled __read_mostly = false;/__maybe_static bool ksu_selinux_hide_enabled __read_mostly = true;/' KernelSU/kernel/feature/selinux_hide.c
+    echo "[+] SELinux hide enabled by default."
     # Patch: cache lsposed_file SID for AVC audit suppression
     python3 scripts/patch_selinux_sid.py
     echo "[+] lsposed_file SID cached for AVC suppression."

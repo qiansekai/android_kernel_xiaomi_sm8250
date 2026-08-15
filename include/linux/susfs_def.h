@@ -155,6 +155,14 @@ static inline bool susfs_is_current_proc_umounted_app(void) {
 #endif
 }
 
+static inline bool susfs_is_current_app(void) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+	return likely(__kuid_val(current_uid()) >= 10000);
+#else
+	return likely(current_uid().val >= 10000);
+#endif
+}
+
 #define SUSFS_IS_INODE_SUS_MAP(inode) \
 		inode && inode->i_mapping && \
 		unlikely(test_bit(AS_FLAGS_SUS_MAP, &inode->i_state)) && \

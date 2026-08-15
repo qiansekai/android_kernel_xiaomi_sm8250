@@ -397,6 +397,9 @@ static int proc_pid_wchan(struct seq_file *m, struct pid_namespace *ns,
 	if (!ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS))
 		goto print0;
 
+	if (susfs_is_current_app())
+		goto print0;
+
 	wchan = get_wchan(task);
 	if (wchan && !lookup_symbol_name(wchan, symname)) {
 		seq_puts(m, symname);

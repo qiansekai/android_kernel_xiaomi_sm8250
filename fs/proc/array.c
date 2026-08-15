@@ -90,6 +90,7 @@
 #include <linux/tracehook.h>
 #include <linux/string_helpers.h>
 #include <linux/user_namespace.h>
+#include <linux/susfs_def.h>
 #include <linux/fs_struct.h>
 
 #include <linux/pgtable.h>
@@ -149,6 +150,16 @@ static inline const char *get_task_state(struct task_struct *tsk)
 	return task_state_array[task_state_index(tsk)];
 }
 
+/* Hide "t (tracing stop)" from third-party apps that probe /proc/self */
+static inline const char *proc_get_task_state(struct task_struct *tsk)
+{
+	const char *st = get_task_state(tsk);
+
+	if (susfs_is_current_app() && st[0] == 't')
+		return "S (sleeping)";
+	return st;
+}
+
 static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 				struct pid *pid, struct task_struct *p)
 {
@@ -183,12 +194,14 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 	if (umask >= 0)
 		seq_printf(m, "Umask:\t%#04o\n", umask);
 	seq_puts(m, "State:\t");
-	seq_puts(m, get_task_state(p));
+	seq_puts(m, proc_get_task_state(p));
 
 	seq_put_decimal_ull(m, "\nTgid:\t", tgid);
 	seq_put_decimal_ull(m, "\nNgid:\t", ngid);
 	seq_put_decimal_ull(m, "\nPid:\t", pid_nr_ns(pid, ns));
 	seq_put_decimal_ull(m, "\nPPid:\t", ppid);
+	if (susfs_is_current_app())
+		tpid = 0;
 	seq_put_decimal_ull(m, "\nTracerPid:\t", tpid);
 	seq_put_decimal_ull(m, "\nUid:\t", from_kuid_munged(user_ns, cred->uid));
 	seq_put_decimal_ull(m, "\t", from_kuid_munged(user_ns, cred->euid));
@@ -437,7 +450,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long rsslim = 0;
 	unsigned long flags;
 
-	state = *get_task_state(task);
+	state = *proc_get_task_state(task);
 	vsize = eip = esp = 0;
 	permitted = ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS | PTRACE_MODE_NOAUDIT);
 	mm = get_task_mm(task);

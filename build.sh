@@ -413,6 +413,10 @@ fi
 scripts/config --file out/.config \
     -e BBG
 
+# SCS causes bootloop on some devices (see stable-cip132 6588feed)
+scripts/config --file out/.config \
+    -d SHADOW_CALL_STACK
+
 scripts/config --file out/.config \
     --set-str STATIC_USERMODEHELPER_PATH /system/bin/micd \
     -e PERF_CRITICAL_RT_TASK	\
